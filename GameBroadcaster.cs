@@ -7,12 +7,15 @@ namespace MyGameBackend
     {
         private readonly IHubContext<GameHub> _hubContext;
         private readonly TimeSpan BroadcastInterval =
-            TimeSpan.FromMilliseconds(100);
+            TimeSpan.FromMilliseconds(40);
         private Timer _broadcastLoop;
         private bool _modelUpdated;
 
-        ConcurrentQueue<SyncObjectModel> _oneFrameSyncModels = new ConcurrentQueue<SyncObjectModel>();
-        ConcurrentQueue<PlayerModel> _players = new ConcurrentQueue<PlayerModel>();
+        //ConcurrentQueue<SyncObjectModel> _oneFrameSyncModels = new();
+        //ConcurrentQueue<PlayerModel> _players = new();
+
+        List<PlayerModel> _players = new();
+        ConcurrentQueue<SyncObjectModel> _oneFrameSyncModels = new();
 
         public GameBroadcaster(IHubContext<GameHub> hubContext)
         {
@@ -33,8 +36,10 @@ namespace MyGameBackend
                 foreach (var model in _oneFrameSyncModels)
                 {
                     if (_players.Any(p => p.ConnectionId == model.Authority))
+                    {
+                        _hubContext.Clients.Client(model.Authority).SendAsync("Receive", new SyncObjectModel(model.X, model.Y, model.Id, null));
                         _hubContext.Clients.AllExcept(model.Authority).SendAsync("Receive", model);
-                    //else удалить его из _players
+                    }
                 }
                 _modelUpdated = false;
                 _oneFrameSyncModels.Clear();
@@ -48,14 +53,16 @@ namespace MyGameBackend
         }
         public void AddPlayerInGame(PlayerModel player)
         {
-            // Добавить проверку
-            int playersCount = _players.Count;
-            player.PlayerIndex = playersCount;
+            if (!_players.Any(p => p.ConnectionId == player.ConnectionId))
+            {
+                int playersCount = _players.Count;
+                player.PlayerIndex = playersCount;
 
-            _hubContext.Clients.Client(player.ConnectionId).SendAsync("AddPlayers", _players.Select(o => new SyncObjectModel(400, 400, o.PlayerIndex, o.ConnectionId)).ToList());
-            _hubContext.Clients.AllExcept(player.ConnectionId).SendAsync("AddPlayers", new List<SyncObjectModel>() { new SyncObjectModel(400, 400, player.PlayerIndex, player.ConnectionId) });
-            _players.Enqueue(player);
-
+                // Это нужно правильно переписать!!!
+                _hubContext.Clients.Client(player.ConnectionId).SendAsync("AddPlayers", _players.Select(o => new SyncObjectModel(400, 400, o.PlayerIndex, o.ConnectionId)).ToList());
+                _hubContext.Clients.AllExcept(player.ConnectionId).SendAsync("AddPlayers", new List<SyncObjectModel>() { new SyncObjectModel(400, 400, player.PlayerIndex, player.ConnectionId) });
+                _players.Add(player);
+            }
         }
     }
 }

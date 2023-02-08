@@ -8,8 +8,11 @@ builder.Services.AddCors(options =>
     options.AddPolicy(myAllowSpecificOrigins,
         policy =>
         {
-            policy.WithOrigins(
-                "http://79.136.237.76:3333")
+            policy.WithOrigins("http://127.0.0.1:3987",
+                "http://localhost",
+                "http://192.168.0.113",
+                "http://79.136.237.76:3333",
+                "http://79.136.237.76:7070")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
