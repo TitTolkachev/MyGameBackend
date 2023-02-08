@@ -8,13 +8,18 @@ namespace MyGameBackend
         private readonly IHubContext<GameHub> _hubContext;
         private readonly TimeSpan BroadcastInterval =
             TimeSpan.FromMilliseconds(40);
+        private readonly TimeSpan RefreshClientsPlayersListInterval =
+            TimeSpan.FromMilliseconds(1500);
         private Timer _broadcastLoop;
+        private Timer _refreshClientsPlayersListLoop;
         private bool _modelUpdated;
+        private int _playerId = 0;
 
         //ConcurrentQueue<SyncObjectModel> _oneFrameSyncModels = new();
         //ConcurrentQueue<PlayerModel> _players = new();
 
-        List<PlayerModel> _players = new();
+        ConcurrentQueue<SyncObjectModel> _players = new();
+        ConcurrentQueue<SyncObjectModel> _refreshedPlayers = new();
         ConcurrentQueue<SyncObjectModel> _oneFrameSyncModels = new();
 
         public GameBroadcaster(IHubContext<GameHub> hubContext)
@@ -27,6 +32,12 @@ namespace MyGameBackend
                 null,
                 BroadcastInterval,
                 BroadcastInterval);
+            _refreshClientsPlayersListLoop = new Timer(
+                RefreshClientsPlayersList,
+                null,
+                RefreshClientsPlayersListInterval,
+                RefreshClientsPlayersListInterval
+                );
         }
         public void Broadcast(object state)
         {
@@ -35,11 +46,11 @@ namespace MyGameBackend
             {
                 foreach (var model in _oneFrameSyncModels)
                 {
-                    if (_players.Any(p => p.ConnectionId == model.Authority))
-                    {
-                        _hubContext.Clients.Client(model.Authority).SendAsync("Receive", new SyncObjectModel(model.X, model.Y, model.Id, null));
-                        _hubContext.Clients.AllExcept(model.Authority).SendAsync("Receive", model);
-                    }
+                    //if (_players.Any(p => p.ConnectionId == model.Authority))
+                    //{
+                    _hubContext.Clients.Client(model.Authority).SendAsync("Receive", new SyncObjectModel(model.X, model.Y, model.Id, null));
+                    _hubContext.Clients.AllExcept(model.Authority).SendAsync("Receive", model);
+                    //}
                 }
                 _modelUpdated = false;
                 _oneFrameSyncModels.Clear();
@@ -51,18 +62,30 @@ namespace MyGameBackend
 
             _modelUpdated = true;
         }
-        public void AddPlayerInGame(PlayerModel player)
+        public void AddPlayerInGame(SyncObjectModel player)
         {
-            if (!_players.Any(p => p.ConnectionId == player.ConnectionId))
-            {
-                int playersCount = _players.Count;
-                player.PlayerIndex = playersCount;
+            //if (!_players.Any(p => p.ConnectionId == player.ConnectionId))
+            //{
+            player.Id = _playerId++;
 
-                // Это нужно правильно переписать!!!
-                _hubContext.Clients.Client(player.ConnectionId).SendAsync("AddPlayers", _players.Select(o => new SyncObjectModel(400, 400, o.PlayerIndex, o.ConnectionId)).ToList());
-                _hubContext.Clients.AllExcept(player.ConnectionId).SendAsync("AddPlayers", new List<SyncObjectModel>() { new SyncObjectModel(400, 400, player.PlayerIndex, player.ConnectionId) });
-                _players.Add(player);
+            _hubContext.Clients.Client(player.Authority).SendAsync("AddPlayers", _players);
+            _players.Enqueue(player);
+            _refreshedPlayers.Enqueue(player); 
+            _hubContext.Clients.AllExcept(player.Authority).SendAsync("AddPlayers", new List<SyncObjectModel>() { player });
+            //}
+        }
+        public void RefreshPlayer(SyncObjectModel player)
+        {
+            _refreshedPlayers.Enqueue(player);
+        }
+        public void RefreshClientsPlayersList(object state)
+        {
+            if (!_refreshedPlayers.IsEmpty)
+            {
+                _players = _refreshedPlayers;
+                _refreshedPlayers = new();
             }
+            _hubContext.Clients.All.SendAsync("RefreshPlayersList", _players);
         }
     }
 }

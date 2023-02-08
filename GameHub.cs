@@ -11,12 +11,12 @@ namespace MyGameBackend
             _broadcaster = broadcaster;
         }
 
-        public PlayerModel RegisterPlayer(PlayerModel playerModel)
+        public SyncObjectModel RegisterPlayer(SyncObjectModel player)
         {
-            playerModel.ConnectionId = Context.ConnectionId;
-            _broadcaster.AddPlayerInGame(playerModel);
+            player.Authority = Context.ConnectionId;
+            _broadcaster.AddPlayerInGame(player);
 
-            return playerModel;
+            return player;
         }
 
         public SyncObjectModel MovePlayer(double x, double y)
@@ -25,6 +25,12 @@ namespace MyGameBackend
             _broadcaster.UpdateModel(player);
 
             return player;
+        }
+
+        public void RefreshPlayer(SyncObjectModel player)
+        {
+            player.Authority = Context.ConnectionId;
+            _broadcaster.RefreshPlayer(player);
         }
     }
 }
