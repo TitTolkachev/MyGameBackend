@@ -13,7 +13,7 @@ namespace MyGameBackend
         private Timer _broadcastLoop;
         private Timer _refreshClientsPlayersListLoop;
         private bool _modelUpdated;
-        private int _playerId = 0;
+        private int _playerId = 1;
 
         //ConcurrentQueue<SyncObjectModel> _oneFrameSyncModels = new();
         //ConcurrentQueue<PlayerModel> _players = new();
@@ -66,11 +66,9 @@ namespace MyGameBackend
         {
             //if (!_players.Any(p => p.ConnectionId == player.ConnectionId))
             //{
-            player.Id = _playerId++;
-
             _hubContext.Clients.Client(player.Authority).SendAsync("AddPlayers", _players);
             _players.Enqueue(player);
-            _refreshedPlayers.Enqueue(player); 
+            _refreshedPlayers.Enqueue(player);
             _hubContext.Clients.AllExcept(player.Authority).SendAsync("AddPlayers", new List<SyncObjectModel>() { player });
             //}
         }
@@ -86,6 +84,11 @@ namespace MyGameBackend
                 _refreshedPlayers = new();
             }
             _hubContext.Clients.All.SendAsync("RefreshPlayersList", _players);
+        }
+
+        public void SendId(string authority)
+        {
+            _hubContext.Clients.Client(authority).SendAsync("PlayerId", _playerId++);
         }
     }
 }

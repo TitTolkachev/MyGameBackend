@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR;
+using System.Numerics;
 
 namespace MyGameBackend
 {
@@ -11,26 +12,27 @@ namespace MyGameBackend
             _broadcaster = broadcaster;
         }
 
-        public SyncObjectModel RegisterPlayer(SyncObjectModel player)
+        public void RegisterPlayer(SyncObjectModel player)
         {
             player.Authority = Context.ConnectionId;
             _broadcaster.AddPlayerInGame(player);
-
-            return player;
         }
 
-        public SyncObjectModel MovePlayer(double x, double y)
+        public void MovePlayer(SyncObjectModel player)
         {
-            SyncObjectModel player = new(x, y, 0, Context.ConnectionId);
+            player.Authority = Context.ConnectionId;
             _broadcaster.UpdateModel(player);
-
-            return player;
         }
 
         public void RefreshPlayer(SyncObjectModel player)
         {
             player.Authority = Context.ConnectionId;
             _broadcaster.RefreshPlayer(player);
+        }
+
+        public void GeneratePlayerId()
+        {
+            _broadcaster.SendId(Context.ConnectionId);
         }
     }
 }
