@@ -34,5 +34,10 @@ namespace MyGameBackend
         {
             _broadcaster.SendId(Context.ConnectionId);
         }
+
+        public void AddProjectile(ProjectileModel projectile)
+        {
+            _broadcaster.AddProjectile(projectile);
+        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
+using System.Numerics;
 
 namespace MyGameBackend
 {
@@ -19,6 +20,7 @@ namespace MyGameBackend
         //ConcurrentQueue<PlayerModel> _players = new();
 
         ConcurrentQueue<SyncObjectModel> _players = new();
+        ConcurrentQueue<ProjectileModel> _projectiles = new();
         ConcurrentQueue<SyncObjectModel> _refreshedPlayers = new();
         ConcurrentQueue<SyncObjectModel> _oneFrameSyncModels = new();
 
@@ -58,7 +60,8 @@ namespace MyGameBackend
         }
         public void UpdateModel(SyncObjectModel clientModel)
         {
-            _oneFrameSyncModels.Enqueue(clientModel);
+            if (_players.Any(p => p.Id == clientModel.Id))
+                _oneFrameSyncModels.Enqueue(clientModel);
 
             _modelUpdated = true;
         }
@@ -67,6 +70,7 @@ namespace MyGameBackend
             //if (!_players.Any(p => p.ConnectionId == player.ConnectionId))
             //{
             _hubContext.Clients.Client(player.Authority).SendAsync("AddPlayers", _players);
+            _hubContext.Clients.Client(player.Authority).SendAsync("AddProjectiles", _projectiles);
             _players.Enqueue(player);
             _refreshedPlayers.Enqueue(player);
             _hubContext.Clients.AllExcept(player.Authority).SendAsync("AddPlayers", new List<SyncObjectModel>() { player });
@@ -74,21 +78,28 @@ namespace MyGameBackend
         }
         public void RefreshPlayer(SyncObjectModel player)
         {
-            _refreshedPlayers.Enqueue(player);
+            if (!_refreshedPlayers.Any(p => p.Id == player.Id) && _players.Any(p => p.Id == player.Id))
+                _refreshedPlayers.Enqueue(player);
         }
         public void RefreshClientsPlayersList(object state)
         {
-            if (!_refreshedPlayers.IsEmpty)
-            {
-                _players = _refreshedPlayers;
-                _refreshedPlayers = new();
-            }
+            _players = _refreshedPlayers;
+            _refreshedPlayers = new();
+
             _hubContext.Clients.All.SendAsync("RefreshPlayersList", _players);
         }
 
         public void SendId(string authority)
         {
             _hubContext.Clients.Client(authority).SendAsync("PlayerId", _playerId++);
+        }
+
+
+        // Projectiles
+        public void AddProjectile(ProjectileModel projectile)
+        {
+            _projectiles.Enqueue(projectile);
+            _hubContext.Clients.All.SendAsync("AddProjectiles", new List<ProjectileModel>() { projectile });
         }
     }
 }
